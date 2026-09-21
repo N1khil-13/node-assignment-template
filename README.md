@@ -194,6 +194,5 @@ src/
 │   └── bid.test.js
 ├── app.js
 ├── server.js
-├── .env.example
 └── package.json
 ```
