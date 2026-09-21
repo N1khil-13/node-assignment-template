@@ -1,3 +1,6 @@
-// TODO: define your data model here
+const { Auction, bidSchema } = require("./auction");
 
-module.exports = {};
+module.exports = {
+    Auction,
+    bidSchema
+};

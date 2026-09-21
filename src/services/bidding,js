@@ -1,0 +1,100 @@
+const mongoose = require("mongoose");
+const { Auction } = require("../models/auction");
+
+const BID_RESULT = {
+    ACCEPTED: "accepted",
+    AUCTION_NOT_FOUND: "auction_not_found",
+    AUCTION_CLOSED: "auction_closed",
+    BID_TOO_LOW: "bid_too_low"
+};
+
+const placeBid = async ({ auctionId, userId, amount, now = new Date() }) => {
+    if (!mongoose.isValidObjectId(auctionId)) {
+        return { type: BID_RESULT.AUCTION_NOT_FOUND };
+    }
+
+    const bidId = new mongoose.Types.ObjectId();
+    const createdAt = new Date(now);
+
+    const updatedAuction = await Auction.findOneAndUpdate(
+        {
+            _id: auctionId,
+            startTime: { $lte: now },
+            endTime: { $gt: now },
+            $or: [
+                { currentBid: null },
+                { "currentBid.amount": { $lt: amount } }
+            ]
+        },
+        {
+            $set: {
+                currentBid: {
+                    bidId,
+                    userId,
+                    amount,
+                    createdAt
+                }
+            },
+            $push: {
+                bids: {
+                    _id: bidId,
+                    userId,
+                    amount,
+                    createdAt
+                }
+            }
+        },
+        {
+            new: true,
+            runValidators: true
+        }
+    ).lean();
+
+    if (updatedAuction) {
+        return {
+            type: BID_RESULT.ACCEPTED,
+            bid: {
+                bidId: bidId.toString(),
+                auctionId: updatedAuction._id.toString(),
+                userId,
+                amount,
+                createdAt: createdAt.toISOString()
+            },
+            currentBid: {
+                bidId: updatedAuction.currentBid.bidId.toString(),
+                userId: updatedAuction.currentBid.userId,
+                amount: updatedAuction.currentBid.amount,
+                createdAt: updatedAuction.currentBid.createdAt.toISOString()
+            }
+        };
+    }
+
+    const auction = await Auction.findById(auctionId)
+        .select("startTime endTime currentBid")
+        .lean();
+
+    if (!auction) {
+        return { type: BID_RESULT.AUCTION_NOT_FOUND };
+    }
+
+    if (now < auction.startTime || now >= auction.endTime) {
+        return { type: BID_RESULT.AUCTION_CLOSED };
+    }
+
+    return {
+        type: BID_RESULT.BID_TOO_LOW,
+        currentBid: auction.currentBid
+            ? {
+                bidId: auction.currentBid.bidId.toString(),
+                userId: auction.currentBid.userId,
+                amount: auction.currentBid.amount,
+                createdAt: auction.currentBid.createdAt.toISOString()
+            }
+            : null
+    };
+};
+
+module.exports = {
+    BID_RESULT,
+    placeBid
+};

@@ -1,22 +1,21 @@
-const express = require("express");
-const { testConnection } = require("./db/sequelize");
+require("dotenv").config();
 
-const app = express();
-
-app.use(express.json());
-
-app.post("/bid", (req, res) => {
-  return res.status(501).json({ message: "TODO: implement" });
-});
-
-app.use((err, req, res, next) => {
-  console.error(err);
-  return res.status(500).json({ message: "Internal server error" });
-});
+const app = require("./app");
+const { connectToDatabase } = require("./db/mongoose");
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, async () => {
-  console.log(`Server listening on port ${PORT}`);
-  await testConnection();
-});
+const startServer = async () => {
+  try {
+    await connectToDatabase();
+
+    app.listen(PORT, () => {
+      console.log(`Server listening on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error("Unable to start server:", error.message);
+    process.exit(1);
+  }
+};
+
+startServer();
