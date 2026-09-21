@@ -1,0 +1,31 @@
+Design Decisions
+1. Data model
+I used MongoDB with Mongoose. An auction stores its basic details like the title, start time and end time. It also stores the current highest bid and the list of bids made on that auction.
+I kept the bids inside the auction document because it lets me update the current highest bid and add the new bid in a single database operation.
+This also makes it easier to avoid two requests ending up with different ideas of what the highest bid is.
+Also I am slightly more familiar with mongoose than sequelize so there's that. 
+
+2. Auction close boundary
+I treated endTime as the exact closing point of the auction.
+A bid is accepted only when the current time is before endTime. If the current time is equal to or after endTime, the bid is rejected.
+The time check is done as part of the database update itself, so the auction cannot be considered open just because an earlier check said it was.
+
+3. Placing a new bid
+For every bid, I check that:
+the auction exists
+the auction is still open
+the bid amount is greater than the current highest bid
+The actual update is done atomically in MongoDB. This is important because two people could place bids at almost the same time.
+Only a bid that is higher than the current stored bid can update the auction.
+If the bid doesn't meet these conditions, it is rejected.
+
+4. User bidding on their own current top bid
+I decided to allow it as long as the new bid is strictly higher than their existing bid.
+For example, if a user is currently winning with ₹500, they can increase their bid to ₹600. A new bid of ₹500 would still be rejected.
+I chose this because there is no reason to prevent a user from increasing their own bid, and the main rule is simply that every accepted bid must be higher than the current top bid.
+
+5. One thing I'd change for production
+For this assignment, I kept the bids inside the auction document because it keeps the bidding operation simple and atomic.
+For a real production system with a large number of bids, I would probably move bids into a separate collection. 
+An auction could potentially receive thousands or millions of bids, and keeping all of them inside one MongoDB document could eventually become a problem because MongoDB documents have a size limit.
+I would also add an idempotency key to the API so that if a client retries the same request because of a network issue, we can identify it as the same request instead of treating it as a completely new bid.
